@@ -57,13 +57,87 @@ jobs:
           cp configs/zn-m2-basic.config openwrt/.config
           cd openwrt
           make defconfig
+
+      - name: Force trim USB packages
+        run: |
+          cd openwrt
+
+          disable_symbols=(
+            CONFIG_DEFAULT_kmod-usb-core
+            CONFIG_DEFAULT_kmod-usb2
+            CONFIG_DEFAULT_kmod-usb3
+            CONFIG_DEFAULT_kmod-usb-dwc3
+            CONFIG_DEFAULT_kmod-usb-dwc3-qcom
+            CONFIG_DEFAULT_kmod-usb-phy-msm
+            CONFIG_DEFAULT_kmod-usb-phy-qcom-dwc3
+            CONFIG_DEFAULT_kmod-phy-qcom-qusb2
+            CONFIG_DEFAULT_kmod-phy-qcom-qmp-usb
+            CONFIG_DEFAULT_kmod-usb-xhci-hcd
+            CONFIG_DEFAULT_kmod-usb-ehci
+            CONFIG_DEFAULT_kmod-usb-ohci
+            CONFIG_DEFAULT_kmod-usb-storage
+            CONFIG_DEFAULT_kmod-usb-storage-uas
+            CONFIG_DEFAULT_kmod-usb-storage-alauda
+            CONFIG_DEFAULT_kmod-usb-storage-cypress-atacb
+            CONFIG_DEFAULT_kmod-usb-storage-datafab
+            CONFIG_DEFAULT_kmod-usb-storage-freecom
+            CONFIG_DEFAULT_kmod-usb-storage-isd200
+            CONFIG_DEFAULT_kmod-usb-storage-jumpshot
+            CONFIG_DEFAULT_kmod-usb-storage-karma
+            CONFIG_DEFAULT_kmod-usb-storage-onetouch
+            CONFIG_DEFAULT_kmod-usb-storage-sddr09
+            CONFIG_DEFAULT_kmod-usb-storage-sddr55
+            CONFIG_DEFAULT_kmod-usb-storage-usbat
+            CONFIG_DEFAULT_kmod-usb-ledtrig-usbport
+            CONFIG_DEFAULT_usbutils
+
+            CONFIG_PACKAGE_kmod-usb-core
+            CONFIG_PACKAGE_kmod-usb2
+            CONFIG_PACKAGE_kmod-usb3
+            CONFIG_PACKAGE_kmod-usb-dwc3
+            CONFIG_PACKAGE_kmod-usb-dwc3-qcom
+            CONFIG_PACKAGE_kmod-usb-phy-msm
+            CONFIG_PACKAGE_kmod-usb-phy-qcom-dwc3
+            CONFIG_PACKAGE_kmod-phy-qcom-qusb2
+            CONFIG_PACKAGE_kmod-phy-qcom-qmp-usb
+            CONFIG_PACKAGE_kmod-usb-xhci-hcd
+            CONFIG_PACKAGE_kmod-usb-ehci
+            CONFIG_PACKAGE_kmod-usb-ohci
+            CONFIG_PACKAGE_kmod-usb-storage
+            CONFIG_PACKAGE_kmod-usb-storage-uas
+            CONFIG_PACKAGE_kmod-usb-storage-alauda
+            CONFIG_PACKAGE_kmod-usb-storage-cypress-atacb
+            CONFIG_PACKAGE_kmod-usb-storage-datafab
+            CONFIG_PACKAGE_kmod-usb-storage-freecom
+            CONFIG_PACKAGE_kmod-usb-storage-isd200
+            CONFIG_PACKAGE_kmod-usb-storage-jumpshot
+            CONFIG_PACKAGE_kmod-usb-storage-karma
+            CONFIG_PACKAGE_kmod-usb-storage-onetouch
+            CONFIG_PACKAGE_kmod-usb-storage-sddr09
+            CONFIG_PACKAGE_kmod-usb-storage-sddr55
+            CONFIG_PACKAGE_kmod-usb-storage-usbat
+            CONFIG_PACKAGE_kmod-usb-ledtrig-usbport
+            CONFIG_PACKAGE_usbutils
+          )
+
+          for sym in "${disable_symbols[@]}"; do
+            sed -i "/^${sym}=.*/d" .config
+            sed -i "/^# ${sym} is not set/d" .config
+            echo "# ${sym} is not set" >> .config
+          done
+
+          make defconfig
           cp .config "$GITHUB_WORKSPACE/final.config"
+
           echo "===== TARGET ====="
           grep -E '^CONFIG_TARGET_|^CONFIG_TARGET_PROFILE=' .config || true
+
           echo "===== CORE PACKAGES ====="
-          grep -E '^CONFIG_PACKAGE_(mwan3|luci-app-mwan3|zerotier|kmod-tun|nss-firmware|kmod-qca-nss-dp|kmod-qca-nss-ecm)=' .config || true
+          grep -E '^CONFIG_PACKAGE_(mwan3|luci-app-mwan3|zerotier|luci-app-zerotier|kmod-tun|nss-firmware|kmod-qca-nss-dp|kmod-qca-nss-ecm)=' .config || true
+
           echo "===== USB CHECK ====="
           grep -E '^(CONFIG_DEFAULT_|CONFIG_PACKAGE_)(kmod-usb|kmod-phy-qcom|kmod-usb-phy|usbutils)' .config || true
+
           echo "===== WIFI CHECK ====="
           grep -E '^(CONFIG_DEFAULT_|CONFIG_PACKAGE_)(kmod-ath11k|ath11k-firmware|wpad|hostapd|iwinfo|iw|wireless-regdb|cypress-nvram|kmod-cfg80211|kmod-mac80211)' .config || true
 
