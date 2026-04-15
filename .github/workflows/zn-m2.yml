@@ -48,6 +48,11 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
+      - name: Add HomeProxy package
+        run: |
+          rm -rf openwrt/package/homeproxy
+          git clone --depth 1 https://github.com/immortalwrt/homeproxy.git openwrt/package/homeproxy
+
       - name: Remove unused broken packages
         run: |
           rm -rf openwrt/feeds/packages/net/onionshare-cli
@@ -133,7 +138,7 @@ jobs:
           grep -E '^CONFIG_TARGET_|^CONFIG_TARGET_PROFILE=' .config || true
 
           echo "===== CORE PACKAGES ====="
-          grep -E '^CONFIG_PACKAGE_(mwan3|luci-app-mwan3|zerotier|luci-app-zerotier|kmod-tun|nss-firmware|kmod-qca-nss-dp|kmod-qca-nss-ecm)=' .config || true
+          grep -E '^CONFIG_PACKAGE_(mwan3|luci-app-mwan3|zerotier|luci-app-zerotier|luci-app-homeproxy|sing-box|kmod-nft-tproxy|ucode-mod-digest|kmod-tun|nss-firmware|kmod-qca-nss-dp|kmod-qca-nss-ecm)=' .config || true
 
           echo "===== USB CHECK ====="
           grep -E '^(CONFIG_DEFAULT_|CONFIG_PACKAGE_)(kmod-usb|kmod-phy-qcom|kmod-usb-phy|usbutils)' .config || true
