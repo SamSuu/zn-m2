@@ -48,6 +48,10 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
+      - name: Remove unused broken packages
+        run: |
+          rm -rf openwrt/feeds/packages/net/onionshare-cli
+
       - name: Load config
         run: |
           cp configs/zn-m2-basic.config openwrt/.config
