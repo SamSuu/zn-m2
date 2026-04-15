@@ -57,19 +57,43 @@ jobs:
         run: |
           rm -rf openwrt/feeds/packages/net/onionshare-cli
 
-      - name: Set default LuCI theme to bootstrap
+      - name: Set LuCI defaults and branding
         run: |
           mkdir -p openwrt/files/etc/uci-defaults
-          cat > openwrt/files/etc/uci-defaults/99-theme-bootstrap <<'EOF'
+          mkdir -p openwrt/files/etc
+
+          cat > openwrt/files/etc/uci-defaults/99-custom-ui <<'EOF'
           #!/bin/sh
+
           uci -q batch <<'EOT'
           set luci.main.mediaurlbase='/luci-static/bootstrap'
+          set luci.main.lang='zh_cn'
           commit luci
           EOT
-          rm -f /etc/uci-defaults/99-theme-bootstrap
+
+          if [ -f /etc/openwrt_release ]; then
+            sed -i "s/^DISTRIB_ID=.*/DISTRIB_ID='OpenWrt'/" /etc/openwrt_release
+            sed -i "s/^DISTRIB_DESCRIPTION=.*/DISTRIB_DESCRIPTION='OpenWrt'/" /etc/openwrt_release
+          fi
+
+          for f in /etc/os-release /usr/lib/os-release; do
+            [ -f "$f" ] || continue
+            sed -i 's/^NAME=.*/NAME="OpenWrt"/' "$f"
+            sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="OpenWrt"/' "$f"
+            sed -i 's/^ID=.*/ID="openwrt"/' "$f"
+          done
+
+          rm -f /etc/uci-defaults/99-custom-ui
           exit 0
           EOF
-          chmod +x openwrt/files/etc/uci-defaults/99-theme-bootstrap
+
+          chmod +x openwrt/files/etc/uci-defaults/99-custom-ui
+
+          cat > openwrt/files/etc/banner <<'EOF'
+          -----------------------------------------------------
+           OpenWrt
+          -----------------------------------------------------
+          EOF
 
       - name: Load config
         run: |
@@ -77,7 +101,7 @@ jobs:
           cd openwrt
           make defconfig
 
-      - name: Force trim USB and extra LuCI themes
+      - name: Force trim USB and extra themes
         run: |
           cd openwrt
 
@@ -175,6 +199,9 @@ jobs:
 
           echo "===== CORE PACKAGES ====="
           grep -E '^CONFIG_PACKAGE_(mwan3|luci-app-mwan3|zerotier|luci-app-zerotier|luci-app-homeproxy|sing-box|kmod-nft-tproxy|ucode-mod-digest|kmod-tun|nss-firmware|kmod-qca-nss-dp|kmod-qca-nss-ecm)=' .config || true
+
+          echo "===== LANG CHECK ====="
+          grep -E '^CONFIG_PACKAGE_luci-i18n-.*zh-cn=' .config || true
 
           echo "===== THEME CHECK ====="
           grep -E '^CONFIG_PACKAGE_luci-theme-' .config || true
