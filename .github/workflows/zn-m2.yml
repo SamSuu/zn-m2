@@ -57,18 +57,50 @@ jobs:
         run: |
           rm -rf openwrt/feeds/packages/net/onionshare-cli
 
-      - name: Set LuCI defaults and branding
+      - name: Patch kernel config for no-USB
+        run: |
+          cat >> openwrt/target/linux/qualcommax/ipq60xx/config-6.12 <<'EOF'
+
+          # --- custom no-usb override for ZN M2 ---
+          # CONFIG_USB_SUPPORT is not set
+          # CONFIG_USB is not set
+          # CONFIG_USB_ANNOUNCE_NEW_DEVICES is not set
+          # CONFIG_USB_DEFAULT_PERSIST is not set
+          # CONFIG_USB_STORAGE is not set
+          # CONFIG_USB_UAS is not set
+          # CONFIG_USB_XHCI_HCD is not set
+          # CONFIG_USB_XHCI_PLATFORM is not set
+          # CONFIG_USB_DWC3 is not set
+          # CONFIG_USB_DWC3_QCOM is not set
+          # CONFIG_PHY_QCOM_QMP_USB is not set
+          # CONFIG_PHY_QCOM_QUSB2 is not set
+          EOF
+
+      - name: Prepare firstboot overrides
         run: |
           mkdir -p openwrt/files/etc/uci-defaults
           mkdir -p openwrt/files/etc
 
-          cat > openwrt/files/etc/uci-defaults/99-custom-ui <<'EOF'
+          cat > openwrt/files/etc/uci-defaults/zzz-20260416-force-ui-openwrt <<'EOF'
           #!/bin/sh
 
+          uci -q delete luci.themes
+          uci -q delete luci.languages
+
           uci -q batch <<'EOT'
+          set luci.themes=internal
+          set luci.themes.Bootstrap='/luci-static/bootstrap'
+
+          set luci.languages=internal
+          set luci.languages.zh_Hans='简体中文'
+
           set luci.main.mediaurlbase='/luci-static/bootstrap'
-          set luci.main.lang='zh_cn'
+          set luci.main.lang='zh_Hans'
+
+          set system.@system[0].hostname='OpenWrt'
+
           commit luci
+          commit system
           EOT
 
           if [ -f /etc/openwrt_release ]; then
@@ -83,11 +115,17 @@ jobs:
             sed -i 's/^ID=.*/ID="openwrt"/' "$f"
           done
 
-          rm -f /etc/uci-defaults/99-custom-ui
+          for f in /etc/modules-boot.d/*usb* /etc/modules.d/*usb* /etc/modules.d/*uas* /etc/modules.d/*ums* /etc/modules.d/*ntfs*; do
+            [ -e "$f" ] && rm -f "$f"
+          done
+
+          rmmod ums_usbat ums_sddr55 ums_sddr09 ums_karma ums_jumpshot ums_isd200 ums_freecom ums_datafab ums_cypress ums_alauda uas usb_storage 2>/dev/null || true
+
+          rm -f /etc/uci-defaults/zzz-20260416-force-ui-openwrt
           exit 0
           EOF
 
-          chmod +x openwrt/files/etc/uci-defaults/99-custom-ui
+          chmod +x openwrt/files/etc/uci-defaults/zzz-20260416-force-ui-openwrt
 
           cat > openwrt/files/etc/banner <<'EOF'
           -----------------------------------------------------
@@ -101,9 +139,14 @@ jobs:
           cd openwrt
           make defconfig
 
-      - name: Force trim USB and extra themes
+      - name: Force trim target device packages, USB and extra themes
         run: |
           cd openwrt
+
+          sed -i '/^CONFIG_TARGET_DEVICE_PACKAGES_qualcommax_ipq60xx_DEVICE_zn_m2=.*/d' .config
+          cat >> .config <<'EOF'
+          CONFIG_TARGET_DEVICE_PACKAGES_qualcommax_ipq60xx_DEVICE_zn_m2="-ath11k-firmware-ipq6018 -cypress-nvram -kmod-ath11k -kmod-ath11k-ahb -kmod-cfg80211 -kmod-mac80211 -wpad-openssl -wireless-regdb -kmod-usb-core -kmod-usb2 -kmod-usb3 -kmod-usb-dwc3 -kmod-usb-dwc3-qcom -kmod-usb-phy-msm -kmod-usb-phy-qcom-dwc3 -kmod-phy-qcom-qusb2 -kmod-phy-qcom-qmp-usb -kmod-usb-xhci-hcd -kmod-usb-ehci -kmod-usb-ohci -kmod-usb-storage -kmod-usb-storage-extras -kmod-usb-storage-uas -kmod-usb-storage-alauda -kmod-usb-storage-cypress-atacb -kmod-usb-storage-datafab -kmod-usb-storage-freecom -kmod-usb-storage-isd200 -kmod-usb-storage-jumpshot -kmod-usb-storage-karma -kmod-usb-storage-sddr09 -kmod-usb-storage-sddr55 -kmod-usb-storage-usbat -usbutils -kmod-fs-ntfs3 -luci-theme-openwrt -luci-theme-openwrt-2020 -luci-theme-material -luci-theme-lightblue -luci-theme-design -luci-theme-argon -luci-app-argon-config"
+          EOF
 
           disable_symbols=(
             CONFIG_DEFAULT_kmod-usb-core
@@ -128,7 +171,6 @@ jobs:
             CONFIG_DEFAULT_kmod-usb-storage-isd200
             CONFIG_DEFAULT_kmod-usb-storage-jumpshot
             CONFIG_DEFAULT_kmod-usb-storage-karma
-            CONFIG_DEFAULT_kmod-usb-storage-onetouch
             CONFIG_DEFAULT_kmod-usb-storage-sddr09
             CONFIG_DEFAULT_kmod-usb-storage-sddr55
             CONFIG_DEFAULT_kmod-usb-storage-usbat
@@ -157,12 +199,12 @@ jobs:
             CONFIG_PACKAGE_kmod-usb-storage-isd200
             CONFIG_PACKAGE_kmod-usb-storage-jumpshot
             CONFIG_PACKAGE_kmod-usb-storage-karma
-            CONFIG_PACKAGE_kmod-usb-storage-onetouch
             CONFIG_PACKAGE_kmod-usb-storage-sddr09
             CONFIG_PACKAGE_kmod-usb-storage-sddr55
             CONFIG_PACKAGE_kmod-usb-storage-usbat
             CONFIG_PACKAGE_kmod-usb-ledtrig-usbport
             CONFIG_PACKAGE_usbutils
+            CONFIG_PACKAGE_kmod-fs-ntfs3
 
             CONFIG_PACKAGE_luci-theme-openwrt
             CONFIG_PACKAGE_luci-theme-openwrt-2020
@@ -171,12 +213,11 @@ jobs:
             CONFIG_PACKAGE_luci-theme-design
             CONFIG_PACKAGE_luci-theme-argon
             CONFIG_PACKAGE_luci-app-argon-config
-            CONFIG_PACKAGE_luci-theme-edge
-            CONFIG_PACKAGE_luci-theme-teleofis
           )
 
           enable_symbols=(
             CONFIG_PACKAGE_luci-theme-bootstrap
+            CONFIG_LUCI_LANG_zh_Hans
           )
 
           for sym in "${disable_symbols[@]}"; do
@@ -197,20 +238,23 @@ jobs:
           echo "===== TARGET ====="
           grep -E '^CONFIG_TARGET_|^CONFIG_TARGET_PROFILE=' .config || true
 
-          echo "===== CORE PACKAGES ====="
-          grep -E '^CONFIG_PACKAGE_(mwan3|luci-app-mwan3|zerotier|luci-app-zerotier|luci-app-homeproxy|sing-box|kmod-nft-tproxy|ucode-mod-digest|kmod-tun|nss-firmware|kmod-qca-nss-dp|kmod-qca-nss-ecm)=' .config || true
+          echo "===== VERSION CHECK ====="
+          grep -E '^CONFIG_VERSIONOPT=|^CONFIG_VERSION_DIST=' .config || true
+
+          echo "===== DEVICE PACKAGE OVERRIDE ====="
+          grep -E '^CONFIG_TARGET_DEVICE_PACKAGES_qualcommax_ipq60xx_DEVICE_zn_m2=' .config || true
 
           echo "===== LANG CHECK ====="
-          grep -E '^CONFIG_PACKAGE_luci-i18n-.*zh-cn=' .config || true
+          grep -E '^CONFIG_LUCI_LANG_zh_Hans=|^CONFIG_PACKAGE_luci-i18n-.*zh-cn=' .config || true
 
           echo "===== THEME CHECK ====="
           grep -E '^CONFIG_PACKAGE_luci-theme-' .config || true
 
           echo "===== USB CHECK ====="
-          grep -E '^(CONFIG_DEFAULT_|CONFIG_PACKAGE_)(kmod-usb|kmod-phy-qcom|kmod-usb-phy|usbutils)' .config || true
+          grep -E '^(CONFIG_DEFAULT_|CONFIG_PACKAGE_)(kmod-usb|kmod-phy-qcom|kmod-usb-phy|usbutils|kmod-fs-ntfs3)' .config || true
 
-          echo "===== WIFI CHECK ====="
-          grep -E '^(CONFIG_DEFAULT_|CONFIG_PACKAGE_)(kmod-ath11k|ath11k-firmware|wpad|hostapd|iwinfo|iw|wireless-regdb|cypress-nvram|kmod-cfg80211|kmod-mac80211)' .config || true
+          echo "===== KERNEL USB FRAGMENT ====="
+          tail -n 20 target/linux/qualcommax/ipq60xx/config-6.12 || true
 
       - name: Download sources
         run: |
